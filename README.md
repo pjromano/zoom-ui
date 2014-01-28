@@ -1,4 +1,5 @@
-zoomui
+ZoomUI
 ======
 
-General-purpose computing interface using LeapMotion
+Gesture-based computer interface
+
