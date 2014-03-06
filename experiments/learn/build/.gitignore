@@ -1,0 +1,4 @@
+# CodeBlocks configuration files
+*.depend
+*.layout
+
