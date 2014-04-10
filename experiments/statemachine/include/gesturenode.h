@@ -1,6 +1,6 @@
 /*
 	Philip Romano
-	4/7/2014
+	4/9/2014
 	gesturenode.h
 */
 
@@ -29,7 +29,28 @@ class GestureNode {
 		  that corresponds to the branch index that should be followed after
 		  this node.
 		*/
-		virtual int evaluate(const Leap::Frame &frame) = 0;
+		virtual int evaluate(const Leap::Frame& frame) = 0;
+
+		/**
+		  Callback when a node of this GestureNode type becomes the current
+		  node in the graph. nodeid is the ID of the specific node that is
+		  current.
+
+		  It is not required to override this function. Default behavior does
+		  nothing.
+		*/
+		virtual void onEnter(const Leap::Frame& frame,
+				const std::string& nodeid);
+
+		/**
+		  Callback when a node of this GestureNode type loses its status of
+		  current. nodeid is the ID of the specific node that was left.
+
+		  It is not required to override this function. Default behavior does
+		  nothing.
+		*/
+		virtual void onLeave(const Leap::Frame& frame,
+				const std::string& nodeid);
 };
 
 #endif

@@ -1,7 +1,10 @@
 /*
 	Philip Romano
-	4/8/2014
-	Gestures as a state machine
+	4/9/2014
+	update.cpp
+
+	Test for GestureStateGraph
+	Testing the update() function to make sure it is logically correct.
 */
 
 #include <iostream>
@@ -29,12 +32,14 @@ class Node_OneHand : public GestureNode {
 		  1 if one hand is present
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame &frame) {
+		virtual int evaluate(const Leap::Frame& frame) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() == 1) {
 				return 1;
-			} else
+			} else {
+				std::cout << "No hands" << std::endl;
 				return 0;
+			}
 		}
 };
 
@@ -52,18 +57,16 @@ class Node_Horizontal : public GestureNode {
 		  1 if abs(yvel) <= 1/2 abs(xvel) [horizontal palm motion]
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame &frame) {
+		virtual int evaluate(const Leap::Frame& frame) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());
 				Leap::Vector vel = h.palmVelocity();
-				if (abs(vel.y) <= 0.1 * abs(vel.x)) {
+				if (abs(vel.y) <= 0.5 * abs(vel.x)) {
 					std::cout << "HORZ : " << vel.magnitude() << std::endl;
 					return 1;
 				} else
 					return 0;
-//				return (abs(vel.y) <= 0.5 * abs(vel.x))
-//						? 1 : 0;
 			} else
 				return 1;
 		}
@@ -83,18 +86,45 @@ class Node_Vertical : public GestureNode {
 		  1 if abs(xvel) <= 1/2 abs(yvel) [vertical palm motion]
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame &frame) {
+		virtual int evaluate(const Leap::Frame& frame) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());
 				Leap::Vector vel = h.palmVelocity();
-				if (abs(vel.x) < 0.1 * abs(vel.y)) {
+				if (abs(vel.x) < 0.5 * abs(vel.y)) {
 					std::cout << "VERT" << std::endl;
 					return 1;
 				} else
 					return 0;
-//				return (abs(vel.x) <= 0.5 * abs(vel.y))
-//						? 1 : 0;
+			} else
+				return 1;
+		}
+};
+
+class Node_HorizontalSwipe : public GestureNode {
+	public:
+		virtual std::string& getName() {
+			static std::string name("HorizontalSwipe");
+			return name;
+		}
+
+		/**
+		  StateNode
+
+		  Returns
+		  1 if abs(vel.x) > 50 [stay in state]
+		  0 otherwise          [leave state]
+		*/
+		virtual int evaluate(const Leap::Frame& frame) {
+			Leap::HandList hands = frame.hands();
+			if (hands.count() > 0) {
+				Leap::Hand h = (*hands.begin());
+				Leap::Vector vel = h.palmVelocity();
+				if (abs(vel.x) < 0.5 * abs(vel.y)) {
+					std::cout << "VERT" << std::endl;
+					return 1;
+				} else
+					return 0;
 			} else
 				return 1;
 		}

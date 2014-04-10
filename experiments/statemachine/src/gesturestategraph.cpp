@@ -6,6 +6,7 @@
 
 #include <string>
 #include <map>
+#include <iostream>
 
 #include <boost/shared_ptr.hpp>
 
@@ -35,7 +36,7 @@ bool GestureStateGraph::createNodeType(boost::shared_ptr<GestureNode> type) {
 }
 
 boost::shared_ptr<GestureNode> GestureStateGraph::removeNodeType(
-		std::string name) {
+		const std::string& name) {
 	std::map<std::string,boost::shared_ptr<GestureNode> >::iterator it;
 	it = mTypes.find(name);
 	if (it == mTypes.end())
@@ -47,7 +48,8 @@ boost::shared_ptr<GestureNode> GestureStateGraph::removeNodeType(
 	}
 }
 
-bool GestureStateGraph::addNode(std::string type, std::string nodeid) {
+bool GestureStateGraph::addNode(const std::string& type,
+		const std::string& nodeid) {
 	if (!getType(type).get())
 		return false;
 
@@ -67,16 +69,16 @@ bool GestureStateGraph::addNode(std::string type, std::string nodeid) {
 		return false;
 }
 
-bool GestureStateGraph::removeNode(std::string nodeid) {
+bool GestureStateGraph::removeNode(const std::string& nodeid) {
 	// TODO implement!
 	return false;
 }
 
-bool GestureStateGraph::nodeExists(std::string nodeid) {
+bool GestureStateGraph::nodeExists(const std::string& nodeid) {
 	return (mNodes.count(nodeid) > 0);
 }
 
-bool GestureStateGraph::setStart(std::string nodeid) {
+bool GestureStateGraph::setStart(const std::string& nodeid) {
 	if (nodeExists(nodeid)) {
 		mStartNode = nodeid;
 		return true;
@@ -92,8 +94,8 @@ boost::shared_ptr<GestureNode> GestureStateGraph::getCurrentState() {
 	return getTypeFromNode(mCurrentNode);
 }
 
-bool GestureStateGraph::addConnection(std::string start, int slot,
-		std::string end) {
+bool GestureStateGraph::addConnection(const std::string& start, int slot,
+		const std::string& end) {
 	if (nodeExists(start) && nodeExists(end)) {
 		std::map<int,std::string>& slots = getAdjacencies(start);
 		slots[slot] = end;
@@ -102,7 +104,7 @@ bool GestureStateGraph::addConnection(std::string start, int slot,
 		return false;
 }
 
-bool GestureStateGraph::removeConnection(std::string start, int slot) {
+bool GestureStateGraph::removeConnection(const std::string& start, int slot) {
 	if (nodeExists(start)) {
 		std::map<int,std::string>& slots = getAdjacencies(start);
 		return (slots.erase(slot) == 1);
@@ -110,7 +112,7 @@ bool GestureStateGraph::removeConnection(std::string start, int slot) {
 		return false;
 }
 
-std::string GestureStateGraph::getSlot(std::string nodeid, int slot) {
+std::string GestureStateGraph::getSlot(const std::string& nodeid, int slot) {
 	if (nodeExists(nodeid)) {
 		std::map<int,std::string> adjacencies = getAdjacencies(nodeid);
 		std::map<int,std::string>::iterator it = adjacencies.find(slot);
@@ -125,7 +127,9 @@ std::string GestureStateGraph::getSlot(std::string nodeid, int slot) {
 void GestureStateGraph::update(const Leap::Frame& frame) {
 	std::string newCurrent = mCurrentNode;
 	do {
-		mCurrentNode = newCurrent;
+		if (mCurrentNode.compare(newCurrent) != 0)
+			setCurrent(newCurrent, frame);
+
 		boost::shared_ptr<GestureNode> node = getTypeFromNode(mCurrentNode);
 		if (node.get()) {
 			int slot = node->evaluate(frame);
@@ -134,12 +138,14 @@ void GestureStateGraph::update(const Leap::Frame& frame) {
 			newCurrent = "";
 	} while (newCurrent.compare(mCurrentNode) != 0 && newCurrent.size() > 0);
 
-	mCurrentNode = newCurrent;
-	if (mCurrentNode.size() == 0)
+	if (newCurrent.size() == 0)
 		mCurrentNode = mStartNode;
+	else if (mCurrentNode.compare(newCurrent) != 0)
+		setCurrent(newCurrent, frame);
 }
 
-boost::shared_ptr<GestureNode> GestureStateGraph::getType(std::string name) {
+boost::shared_ptr<GestureNode> GestureStateGraph::getType(
+		const std::string& name) {
 	std::map< std::string,boost::shared_ptr<GestureNode> >::iterator
 		it = mTypes.find(name);
 	if (it == mTypes.end())
@@ -149,12 +155,36 @@ boost::shared_ptr<GestureNode> GestureStateGraph::getType(std::string name) {
 }
 
 boost::shared_ptr<GestureNode> GestureStateGraph::getTypeFromNode(
-		std::string nodeid) {
+		const std::string& nodeid) {
 	std::map<std::string,NodeInstance>::iterator it = mNodes.find(nodeid);
 	if (it == mNodes.end())
 		return boost::shared_ptr<GestureNode>();
 	else
 		return getType((it->second).type);
+}
+
+void GestureStateGraph::updateWithPrint(const Leap::Frame& frame) {
+	std::string newCurrent = mCurrentNode;
+	do {
+		if (mCurrentNode.compare(newCurrent) != 0) {
+			std::cout << newCurrent << std::endl;
+			setCurrent(newCurrent, frame);
+		}
+
+		boost::shared_ptr<GestureNode> node = getTypeFromNode(mCurrentNode);
+		if (node.get()) {
+			int slot = node->evaluate(frame);
+			newCurrent = getSlot(mCurrentNode, slot);
+		} else
+			newCurrent = "";
+	} while (newCurrent.compare(mCurrentNode) != 0 && newCurrent.size() > 0);
+
+	if (newCurrent.size() == 0)
+		mCurrentNode = mStartNode;
+	else if (mCurrentNode.compare(newCurrent) != 0)
+		setCurrent(newCurrent, frame);
+
+	std::cout << "STATE: " << mCurrentNode << std::endl;
 }
 
 
@@ -163,11 +193,20 @@ boost::shared_ptr<GestureNode> GestureStateGraph::getTypeFromNode(
 */
 
 std::map<int,std::string>& GestureStateGraph::getAdjacencies(
-		std::string nodeid) {
+		const std::string& nodeid) {
 	std::map<std::string,NodeInstance>::iterator it = mNodes.find(nodeid);
 	if (it == mNodes.end())
 		throw GestureStateException();
 	else
 		return (it->second).slots;
+}
+
+void GestureStateGraph::setCurrent(const std::string& nodeid,
+		const Leap::Frame& frame) {
+	boost::shared_ptr<GestureNode> previous = getTypeFromNode(mCurrentNode);
+	boost::shared_ptr<GestureNode> next = getTypeFromNode(nodeid);
+	previous->onLeave(frame, mCurrentNode);
+	next->onEnter(frame, nodeid);
+	mCurrentNode = nodeid;
 }
 

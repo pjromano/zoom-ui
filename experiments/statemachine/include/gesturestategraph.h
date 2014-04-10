@@ -76,7 +76,7 @@ class GestureStateGraph {
 		  Returns the GestureNode that was stored, or null if no such
 		  GestureNode existed.
 		*/
-		boost::shared_ptr<GestureNode> removeNodeType(std::string name);
+		boost::shared_ptr<GestureNode> removeNodeType(const std::string& name);
 
 		/**
 		  Add a node to the graph of the given type. The node can be later
@@ -89,7 +89,7 @@ class GestureStateGraph {
 		  Returns true if the node was added; false otherwise (the provided
 		  type name is not registered. See createNodeType())
 		*/
-		bool addNode(std::string type, std::string nodeid);
+		bool addNode(const std::string& type, const std::string& nodeid);
 
 		/**
 		  Remove the node with the given ID from the graph.
@@ -97,15 +97,15 @@ class GestureStateGraph {
 		  Returns true if a node was removed from the graph; false otherwise
 		  (no node with the given ID existed)
 		*/
-		bool removeNode(std::string nodeid);
+		bool removeNode(const std::string& nodeid);
 
 		/**
 		  Returns true if a node with the given id currently exists in the
 		  graph.
 		*/
-		bool nodeExists(std::string nodeid);
+		bool nodeExists(const std::string& nodeid);
 
-		bool setStart(std::string nodeid);
+		bool setStart(const std::string& nodeid);
 
 		boost::shared_ptr<GestureNode> getStart();
 
@@ -119,7 +119,8 @@ class GestureStateGraph {
 		  Returns true if a connection was created; false otherwise (start or
 		  end is not an existent node)
 		*/
-		bool addConnection(std::string start, int slot, std::string end);
+		bool addConnection(const std::string& start, int slot,
+				const std::string& end);
 
 		/**
 		  Remove a connection from the given slot in node start.
@@ -127,14 +128,14 @@ class GestureStateGraph {
 		  Returns true if a connection was removed; false otherwise (start is
 		  not an existent node, or no connection existed in slot)
 		*/
-		bool removeConnection(std::string start, int slot);
+		bool removeConnection(const std::string& start, int slot);
 
 		/**
 		  Returns the name of the connected node in the slot number of the
 		  given node. Returns an empty string if the slot is not connected or
 		  if no node with the given name exists.
 		*/
-		std::string getSlot(std::string nodeid, int slot);
+		std::string getSlot(const std::string& nodeid, int slot);
 
 		/**
 		  Clear all contents of the graph. Node Types are not removed.
@@ -167,13 +168,22 @@ class GestureStateGraph {
 		/**
 		  Returns the GestureNode object associated with the given type name.
 		*/
-		boost::shared_ptr<GestureNode> getType(std::string type);
+		boost::shared_ptr<GestureNode> getType(const std::string& type);
 
 		/**
 		  Returns the GestureNode object associated with the node with the
 		  given id.
 		*/
-		boost::shared_ptr<GestureNode> getTypeFromNode(std::string nodeid);
+		boost::shared_ptr<GestureNode> getTypeFromNode(
+				const std::string& nodeid);
+
+		/**
+		  Performs an update (same as update()), but produces output for each
+		  node that is traversed. Prints the name of the node, and
+		  "STATE: [node]" once the update stops at a state node. Each name
+		  outputted is on a separate line.
+		*/
+		void updateWithPrint(const Leap::Frame& frame);
 
 	private:
 		struct NodeInstance {
@@ -195,11 +205,7 @@ class GestureStateGraph {
 		// the type name and adjacencies (slots)
 		std::map< std::string,NodeInstance > mNodes;
 
-		// Adjacency list. map node name => set of names of adjacent nodes
-//		std::map< std::string, std::set<std::string> > mAdjacencies;
-
 		std::string mStartNode, mCurrentNode;
-
 
 		/**
 		  Returns a reference to the adjacency vector for the node with the
@@ -208,7 +214,13 @@ class GestureStateGraph {
 		  Throws GestureStateException if the given nodename does not exist
 		  in the graph.
 		*/
-		std::map<int,std::string>& getAdjacencies(std::string nodeid);
+		std::map<int,std::string>& getAdjacencies(const std::string& nodeid);
+
+		/**
+		  Set the node with given ID to the current node. Calls the associated
+		  GestureNode's callbacks.
+		*/
+		void setCurrent(const std::string& nodeid, const Leap::Frame& frame);
 
 };
 
