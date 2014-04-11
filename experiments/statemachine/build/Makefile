@@ -8,12 +8,12 @@ TESTDIR = ../tests
 
 CC = g++
 CFLAGS = -I$(INCDIR) -g
-LDFLAGS = -lSDL2 -lGL -lLeap
+LDFLAGS = -lSDL2 -lGL -lGLU -lLeap
 
 SOURCES = $(SRCDIR)/gesturestategraph.cpp $(SRCDIR)/gesturenode.cpp
 HEADERS = $(INCDIR)/gesturestategraph.h $(INCDIR)/gesturenode.h
 
-TESTS = static update simplegraph swipe
+TESTS = static update simplegraph swipe visual
 
 .PHONY: all dirs clean
 

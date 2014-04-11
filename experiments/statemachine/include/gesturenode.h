@@ -29,7 +29,8 @@ class GestureNode {
 		  that corresponds to the branch index that should be followed after
 		  this node.
 		*/
-		virtual int evaluate(const Leap::Frame& frame) = 0;
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) = 0;
 
 		/**
 		  Callback when a node of this GestureNode type becomes the current

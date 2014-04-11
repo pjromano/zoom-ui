@@ -46,7 +46,8 @@ class Engine : public Leap::Listener {
 					    >= 200 mm/s
 					0 otherwise
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					if (e->mMainHand.isValid() && e->mXYHandSpeed >= 300.0)
 						return 1;
 					else
@@ -78,7 +79,8 @@ class Engine : public Leap::Listener {
 
 					2 if error! ...no hands :(
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					// TODO Try getting rid of this check... it shouldn't be
 					// necessary with the right flow of states
 					if (e->mMainHand.isValid()) {
@@ -116,7 +118,8 @@ class Engine : public Leap::Listener {
 
 					2 if error! ...no hands :(
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					// TODO Try getting rid of this check... it shouldn't be
 					// necessary with the right flow of states
 					if (e->mMainHand.isValid()) {
@@ -165,7 +168,8 @@ class Engine : public Leap::Listener {
 
 					2 if error! ...no hands :(
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					// TODO Try getting rid of this check... it shouldn't be
 					// necessary with the right flow of states
 					if (e->mMainHand.isValid()) {
@@ -228,7 +232,8 @@ class Engine : public Leap::Listener {
 					1 if negligible movemtn [ -threshold < vx < threshold ]
 					0 if the timer runs out, or no hand is present
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					if (e->mMainHand.isValid()
 							&& frame.timestamp() - mTimeStart < mTimelimit) {
 						if (e->mHandVelocity.x >= mThreshold)
@@ -284,7 +289,8 @@ class Engine : public Leap::Listener {
 					1 if negligible movemnt [ -threshold < vy < threshold ]
 					0 if the timer runs out, or no hand is present
 				*/
-				virtual int evaluate(const Leap::Frame& frame) {
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
 					if (e->mMainHand.isValid()
 							&& frame.timestamp() - mTimeStart < mTimelimit) {
 						if (e->mHandVelocity.y >= mThreshold)

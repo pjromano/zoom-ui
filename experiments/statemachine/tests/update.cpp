@@ -32,7 +32,8 @@ class Node_OneHand : public GestureNode {
 		  1 if one hand is present
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() == 1) {
 				return 1;
@@ -57,7 +58,8 @@ class Node_Horizontal : public GestureNode {
 		  1 if abs(yvel) <= 1/2 abs(xvel) [horizontal palm motion]
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());
@@ -86,7 +88,8 @@ class Node_Vertical : public GestureNode {
 		  1 if abs(xvel) <= 1/2 abs(yvel) [vertical palm motion]
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());
@@ -115,7 +118,8 @@ class Node_HorizontalSwipe : public GestureNode {
 		  1 if abs(vel.x) > 50 [stay in state]
 		  0 otherwise          [leave state]
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());

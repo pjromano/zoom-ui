@@ -39,7 +39,8 @@ class Node_Motion : public GestureNode {
 			    200mm/s
 		    0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() == 1) {
 				Leap::Hand h = (*hands.begin());
@@ -75,7 +76,8 @@ class Node_Direction : public GestureNode {
 
 		    2 if error! ...No hands
 		*/
-		virtual int evaluate(const Leap::Frame& frame) {
+		virtual int evaluate(const Leap::Frame& frame,
+				const std::string& nodeid) {
 			Leap::HandList hands = frame.hands();
 			if (hands.count() > 0) {
 				Leap::Hand h = (*hands.begin());

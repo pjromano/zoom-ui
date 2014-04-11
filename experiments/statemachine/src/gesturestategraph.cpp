@@ -132,7 +132,7 @@ void GestureStateGraph::update(const Leap::Frame& frame) {
 
 		boost::shared_ptr<GestureNode> node = getTypeFromNode(mCurrentNode);
 		if (node.get()) {
-			int slot = node->evaluate(frame);
+			int slot = node->evaluate(frame, mCurrentNode);
 			newCurrent = getSlot(mCurrentNode, slot);
 		} else
 			newCurrent = "";
@@ -173,7 +173,7 @@ void GestureStateGraph::updateWithPrint(const Leap::Frame& frame) {
 
 		boost::shared_ptr<GestureNode> node = getTypeFromNode(mCurrentNode);
 		if (node.get()) {
-			int slot = node->evaluate(frame);
+			int slot = node->evaluate(frame, mCurrentNode);
 			newCurrent = getSlot(mCurrentNode, slot);
 		} else
 			newCurrent = "";

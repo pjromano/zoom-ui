@@ -27,7 +27,8 @@ class Node_Horizontal : public GestureNode {
 		  1 if abs(yvel) <= 1/2 abs(xvel)
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame &frame) {
+		virtual int evaluate(const Leap::Frame &frame,
+				const std::string& nodeid) {
 			Leap::Hand h = frame.hand(0);
 			if (h.isValid()) {
 				Leap::Vector vel = h.palmVelocity();
@@ -50,7 +51,8 @@ class Node_Vertical : public GestureNode {
 		  1 if abs(xvel) <= 1/2 abs(yvel)
 		  0 otherwise
 		*/
-		virtual int evaluate(const Leap::Frame &frame) {
+		virtual int evaluate(const Leap::Frame &frame,
+				const std::string& nodeid) {
 			Leap::Hand h = frame.hand(0);
 			if (h.isValid()) {
 				Leap::Vector vel = h.palmVelocity();
