@@ -139,7 +139,7 @@ void GestureStateGraph::update(const Leap::Frame& frame) {
 	} while (newCurrent.compare(mCurrentNode) != 0 && newCurrent.size() > 0);
 
 	if (newCurrent.size() == 0)
-		mCurrentNode = mStartNode;
+		setCurrent(mStartNode, frame);
 	else if (mCurrentNode.compare(newCurrent) != 0)
 		setCurrent(newCurrent, frame);
 }
@@ -180,7 +180,7 @@ void GestureStateGraph::updateWithPrint(const Leap::Frame& frame) {
 	} while (newCurrent.compare(mCurrentNode) != 0 && newCurrent.size() > 0);
 
 	if (newCurrent.size() == 0)
-		mCurrentNode = mStartNode;
+		setCurrent(mStartNode, frame);
 	else if (mCurrentNode.compare(newCurrent) != 0)
 		setCurrent(newCurrent, frame);
 

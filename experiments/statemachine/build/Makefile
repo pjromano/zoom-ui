@@ -13,7 +13,7 @@ LDFLAGS = -lSDL2 -lGL -lGLU -lLeap
 SOURCES = $(SRCDIR)/gesturestategraph.cpp $(SRCDIR)/gesturenode.cpp
 HEADERS = $(INCDIR)/gesturestategraph.h $(INCDIR)/gesturenode.h
 
-TESTS = static update simplegraph swipe visual
+TESTS = static update simplegraph swipe visual homescreen
 
 .PHONY: all dirs clean
 

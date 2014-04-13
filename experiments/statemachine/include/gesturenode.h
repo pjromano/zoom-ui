@@ -22,7 +22,7 @@ class GestureNode {
 			that this GestureNode imparts on a node as part of the
 			GestureStateGraph.
 		*/
-		virtual std::string& getName() = 0;
+		virtual const std::string& getName() = 0;
 
 		/**
 		  Processes the provided Leap Motion frame data and returns an integer

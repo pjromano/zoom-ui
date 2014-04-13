@@ -1,12 +1,11 @@
 /*
 	Philip Romano
 	4/12/2014
-	visual.cpp
+	homescreen.cpp
 
 	Test for GestureStateGraph
-	Based on the graph from the swipe test. Adds a graphical layer over the
-	GestureStateGraph to test the visual feedback that is possible with this
-	mechanism.
+	Extension of visual.cpp to include other swiping directions, according to
+	the design for the Home Screen.
 */
 
 #include <iostream>
@@ -18,6 +17,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <boost/shared_ptr.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "gesturestategraph.h"
 #include "gesturenode.h"
@@ -37,6 +37,10 @@ class EngineException : public std::exception {
 			return mMessage;
 		}
 
+		const char* what() {
+			return mMessage.c_str();
+		}
+
 	private:
 		std::string mMessage;
 };
@@ -46,10 +50,12 @@ class Engine : public Leap::Listener {
 		class Node_Motion : public GestureNode {
 			private:
 				Engine *e;
+				double mThreshold;
 
 			public:
-				Node_Motion(Engine *creator) {
+				Node_Motion(Engine *creator, double threshold = 300.0) {
 					e = creator;
+					mThreshold = threshold;
 				}
 
 				virtual const std::string& getName() {
@@ -68,7 +74,8 @@ class Engine : public Leap::Listener {
 				*/
 				virtual int evaluate(const Leap::Frame& frame,
 						const std::string& nodeid) {
-					if (e->mMainHand.isValid() && e->mXYHandSpeed >= 300.0)
+					if (e->mMainHand.isValid()
+							&& e->mXYHandSpeed >= mThreshold)
 						return 1;
 					else {
 						e->mListNudge = e->mHandVelocity.x;
@@ -92,27 +99,35 @@ class Engine : public Leap::Listener {
 				}
 
 				/**
-				  Determines the direction of motion in the xy-plane; either
-				  horizontal or vertical, split by the lines y = x and y = -x
+				  Determines the direction of motion; vertical, horizontal, or
+				  depth-wise. The regions are split by the planes y = x,
+				  y = -x, y = z, and y = -z.
 
 				  Slots:
-					0 if vertical motion   [ |vx| < |vy| ]
-					1 if horizontal motion [ otherwise ]
+					0 if vertical motion   [ |vy| > |vx| && |vy| > |vz| ]
+					1 if horizontal motion [ |vx| > |vy| && |vx| > |vz| ]
+					2 if depthwise motion  [ otherwise ]
+					                       // [ |vz| > |vx| && |vz| > |vy| ]
 
-					2 if error! ...no hands :(
+					3 if error! ...no hands :(
 				*/
 				virtual int evaluate(const Leap::Frame& frame,
 						const std::string& nodeid) {
 					// TODO Try getting rid of this check... it shouldn't be
 					// necessary with the right flow of states
 					if (e->mMainHand.isValid()) {
-						if (abs(e->mHandVelocity.x) < abs(e->mHandVelocity.y))
+						if (abs(e->mHandVelocity.y) > abs(e->mHandVelocity.x)
+						 && abs(e->mHandVelocity.y) > abs(e->mHandVelocity.z))
 							return 0;
-						else
+						else if (
+							abs(e->mHandVelocity.x) > abs(e->mHandVelocity.y)
+						 && abs(e->mHandVelocity.x) > abs(e->mHandVelocity.z))
 							return 1;
+						else
+							return 2;
 					} else {
 						std::cout << "BAD!!" << std::endl;
-						return 2;
+						return 3;
 					}
 				}
 		};
@@ -120,17 +135,24 @@ class Engine : public Leap::Listener {
 		class Node_LeftRight : public GestureNode {
 			private:
 				Engine *e;
-				float mThreshold;
+				std::string mName;
+				double mThreshold;
 
 			public:
-				Node_LeftRight(Engine *creator, float threshold = 0.0f) {
+				/**
+				  getName() returns "LeftRight" + integer truncation of
+				  threshold
+				*/
+				Node_LeftRight(Engine *creator, double threshold = 0.0f) {
 					e = creator;
 					mThreshold = threshold;
+					mName = "LeftRight";
+					mName.append(
+						boost::lexical_cast<std::string>((int)mThreshold));
 				}
 
 				virtual const std::string& getName() {
-					static std::string name("LeftRight");
-					return name;
+					return mName;
 				}
 
 				/**
@@ -167,12 +189,16 @@ class Engine : public Leap::Listener {
 						const std::string& nodeid) {
 					if (nodeid.compare("swL") == 0) {
 						e->mSelection++;
-						if (e->mSelection >= e->mNumSelections)
+						if (e->mSelection >= e->mNumSelections) {
+							e->mListPosition -= e->mNumSelections;
 							e->mSelection = 0;
+						}
 					} else if (nodeid.compare("swR") == 0) {
 						e->mSelection--;
-						if (e->mSelection < 0)
+						if (e->mSelection < 0) {
+							e->mListPosition += e->mNumSelections;
 							e->mSelection = e->mNumSelections - 1;
+						}
 					}
 				}
 		};
@@ -180,36 +206,48 @@ class Engine : public Leap::Listener {
 		class Node_UpDown : public GestureNode {
 			private:
 				Engine *e;
+				std::string mName;
+				double mThreshold;
 
 			public:
-				Node_UpDown(Engine *creator) {
+				/**
+				  getName() returns "UpDown" + integer truncation of
+				  threshold
+				*/
+				Node_UpDown(Engine *creator, double threshold = 0.0) {
 					e = creator;
+					mThreshold = threshold;
+					mName = "UpDown";
+					mName.append(
+						boost::lexical_cast<std::string>((int)mThreshold));
 				}
 
 				virtual const std::string& getName() {
-					static std::string name("UpDown");
-					return name;
+					return mName;
 				}
 
 				/**
 				  Determines whether the motion is upwards or downwards.
 
 				  Slots:
-					0 if upward motion   [ vy <= 0 ]
-					1 if downward motion [ vy >  0 ]
+					0 if upward motion    [ vy <= -threshold ]
+					1 if downward motion  [ vy >=  threshold ]
+					2 if within threshold [ -threshold < vy < threshold ]
 
-					2 if error! ...no hands :(
+					3 if error! ...no hands :(
 				*/
 				virtual int evaluate(const Leap::Frame& frame,
 						const std::string& nodeid) {
 					if (e->mMainHand.isValid()) {
-						if (e->mHandVelocity.y <= 0)
+						if (e->mHandVelocity.y <= -mThreshold)
 							return 0;
-						else
+						else if (e->mHandVelocity.y >= mThreshold)
 							return 1;
+						else
+							return 2;
 					} else {
 						std::cout << "BAD!!" << std::endl;
-						return 2;
+						return 3;
 					}
 				}
 
@@ -223,12 +261,68 @@ class Engine : public Leap::Listener {
 				}
 		};
 
+		class Node_ForeBack : public GestureNode {
+			private:
+				Engine *e;
+				std::string mName;
+				double mThreshold;
+
+			public:
+				/**
+				  getName() returns "ForeBack" + integer truncation of
+				  threshold
+				*/
+				Node_ForeBack(Engine *creator, double threshold = 0.0f) {
+					e = creator;
+					mThreshold = threshold;
+					mName = "ForeBack";
+					mName.append(
+						boost::lexical_cast<std::string>((int)mThreshold));
+				}
+
+				virtual const std::string& getName() {
+					return mName;
+				}
+
+				/**
+				  Determines whether the motion is forwards or backwards.
+
+				  Slots:
+					0 if foreward motion  [ vz < -threshold ]
+					1 if backward motion  [ vz >  threshold ]
+					2 if within threshold [ -threshold < vz < threshold ]
+
+					3 if error! ...no hands :(
+				*/
+				virtual int evaluate(const Leap::Frame& frame,
+						const std::string& nodeid) {
+					if (e->mMainHand.isValid()) {
+						if (e->mHandVelocity.z < -mThreshold) {
+							e->mTargetZoom += 0.0002 * e->mHandVelocity.z;
+							return 0;
+						} else if (e->mHandVelocity.z > mThreshold) {
+							e->mTargetZoom += 0.0002 * e->mHandVelocity.z;
+							return 1;
+						} else
+							return 2;
+					} else {
+						std::cout << "BAD!!" << std::endl;
+						return 3;
+					}
+				}
+
+				virtual void onLeave(const Leap::Frame& frame,
+						const std::string& nodeid) {
+					e->mTargetZoom = 0.0;
+				}
+		};
+
 		class Node_LeftRightLimbo : public GestureNode {
 			private:
 				Engine *e;
 				uint64_t mTimeStart;
 				uint64_t mTimelimit;
-				float    mThreshold;
+				double   mThreshold;
 
 			public:
 				/**
@@ -238,7 +332,7 @@ class Engine : public Leap::Listener {
 				*/
 				Node_LeftRightLimbo(Engine *creator,
 						uint64_t timer = 100000,
-						float threshold = 50.0f) {
+						double threshold = 50.0) {
 					e = creator;
 					mTimeStart = 0;
 					mThreshold = abs(threshold);
@@ -285,7 +379,7 @@ class Engine : public Leap::Listener {
 				Engine *e;
 				uint64_t mTimeStart;
 				uint64_t mTimelimit;
-				float    mThreshold;
+				double   mThreshold;
 
 			public:
 				/**
@@ -295,7 +389,7 @@ class Engine : public Leap::Listener {
 				*/
 				Node_UpDownLimbo(Engine *creator,
 						uint64_t timer = 100000,
-						float threshold = 50.0f) {
+						double threshold = 50.0) {
 					e = creator;
 					mTimeStart = 0;
 					mThreshold = abs(threshold);
@@ -340,44 +434,60 @@ class Engine : public Leap::Listener {
 		Engine() {
 			mMainHand = Leap::Hand::invalid();
 
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_Motion(this)));
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+			bool success = true;
+
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_Motion(this, 50.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
 						new Node_CoarseDirection(this)));
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_LeftRight(this, 0.0f)));
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_UpDown(this)));
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_LeftRightLimbo(this, 100000, 100.0f)));
-			mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_UpDownLimbo(this, 100000, 100.0f)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_LeftRight(this, 200.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_LeftRight(this, 0.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_UpDown(this, 200.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_UpDown(this, 0.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_ForeBack(this, 5.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_ForeBack(this, 10.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_LeftRightLimbo(this, 100000, 100.0)));
+			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
+						new Node_UpDownLimbo(this, 100000, 100.0)));
+
+			if (!success)
+				throw EngineException("Node type creation failed");
 
 			/* Nodes */
 
 			mGraph.addNode("Motion",          "noMotion");
 			mGraph.addNode("CoarseDirection", "coarse");
-			mGraph.addNode("LeftRight",       "stHorizontal");
-			mGraph.addNode("UpDown",          "stVertical");
+			mGraph.addNode("LeftRight200",    "stHorizontal");
+			mGraph.addNode("UpDown200",       "stVertical");
+			mGraph.addNode("ForeBack5",       "stDepth");
 
-			mGraph.addNode("LeftRight", "swL");
-			mGraph.addNode("LeftRight", "swR");
-			mGraph.addNode("UpDown",    "swU");
-			mGraph.addNode("UpDown",    "swD");
+			mGraph.addNode("LeftRight0", "swL");
+			mGraph.addNode("LeftRight0", "swR");
+			mGraph.addNode("UpDown0",    "swU");
+			mGraph.addNode("UpDown0",    "swD");
+			mGraph.addNode("ForeBack10",  "pull");
+			mGraph.addNode("ForeBack10",  "push");
 
-			mGraph.addNode("LRLimbo",   "swLToBacktrack");
-			mGraph.addNode("LeftRight", "swLBacktrack");
-			mGraph.addNode("LRLimbo",   "swLFromBacktrack");
-			mGraph.addNode("LRLimbo",   "swRToBacktrack");
-			mGraph.addNode("LeftRight", "swRBacktrack");
-			mGraph.addNode("LRLimbo",   "swRFromBacktrack");
+			mGraph.addNode("LRLimbo",     "swLToBacktrack");
+			mGraph.addNode("LeftRight0",  "swLBacktrack");
+			mGraph.addNode("LRLimbo",     "swLFromBacktrack");
+			mGraph.addNode("LRLimbo",     "swRToBacktrack");
+			mGraph.addNode("LeftRight0",  "swRBacktrack");
+			mGraph.addNode("LRLimbo",     "swRFromBacktrack");
 
-			mGraph.addNode("UDLimbo",   "swUToBacktrack");
-			mGraph.addNode("UpDown",    "swUBacktrack");
-			mGraph.addNode("UDLimbo",   "swUFromBacktrack");
-			mGraph.addNode("UDLimbo",   "swDToBacktrack");
-			mGraph.addNode("UpDown",    "swDBacktrack");
-			mGraph.addNode("UDLimbo",   "swDFromBacktrack");
+			mGraph.addNode("UDLimbo",     "swUToBacktrack");
+			mGraph.addNode("UpDown0",     "swUBacktrack");
+			mGraph.addNode("UDLimbo",     "swUFromBacktrack");
+			mGraph.addNode("UDLimbo",     "swDToBacktrack");
+			mGraph.addNode("UpDown0",     "swDBacktrack");
+			mGraph.addNode("UDLimbo",     "swDFromBacktrack");
 
 			mGraph.setStart("noMotion");
 
@@ -386,11 +496,14 @@ class Engine : public Leap::Listener {
 			mGraph.addConnection("noMotion", 1, "coarse");
 			mGraph.addConnection("coarse",   0, "stVertical");
 			mGraph.addConnection("coarse",   1, "stHorizontal");
+			mGraph.addConnection("coarse",   2, "stDepth");
 
 			mGraph.addConnection("stHorizontal", 0, "swL");
 			mGraph.addConnection("stHorizontal", 1, "swR");
 			mGraph.addConnection("stVertical",   0, "swD");
 			mGraph.addConnection("stVertical",   1, "swU");
+			mGraph.addConnection("stDepth",      0, "push");
+			mGraph.addConnection("stDepth",      1, "pull");
 
 			// Swipe LEFT sub-cycle
 			mGraph.addConnection("swL",              0, "swL");
@@ -423,11 +536,13 @@ class Engine : public Leap::Listener {
 			// Swipe UP sub-cycle
 			mGraph.addConnection("swU",              0, "swUToBacktrack");
 			mGraph.addConnection("swU",              1, "swU");
+			mGraph.addConnection("swU",              2, "swUToBacktrack");
 			mGraph.addConnection("swUToBacktrack",   1, "swUToBacktrack");
 			mGraph.addConnection("swUToBacktrack",   2, "swUBacktrack");
 			mGraph.addConnection("swUToBacktrack",   3, "swUToBacktrack");
 			mGraph.addConnection("swUBacktrack",     0, "swUBacktrack");
 			mGraph.addConnection("swUBacktrack",     1, "swUFromBacktrack");
+			mGraph.addConnection("swUBacktrack",     2, "");
 			mGraph.addConnection("swUFromBacktrack", 1, "swUFromBacktrack");
 			mGraph.addConnection("swUFromBacktrack", 2, "swUFromBacktrack");
 			mGraph.addConnection("swUFromBacktrack", 3, "swU");
@@ -435,14 +550,24 @@ class Engine : public Leap::Listener {
 			// Swipe DOWN sub-cycle
 			mGraph.addConnection("swD",              0, "swD");
 			mGraph.addConnection("swD",              1, "swDToBacktrack");
+			mGraph.addConnection("swD",              2, "swDToBacktrack");
 			mGraph.addConnection("swDToBacktrack",   1, "swDToBacktrack");
 			mGraph.addConnection("swDToBacktrack",   2, "swDToBacktrack");
 			mGraph.addConnection("swDToBacktrack",   3, "swDBacktrack");
 			mGraph.addConnection("swDBacktrack",     0, "swDFromBacktrack");
 			mGraph.addConnection("swDBacktrack",     1, "swDBacktrack");
+			mGraph.addConnection("swDBacktrack",     2, "");
 			mGraph.addConnection("swDFromBacktrack", 1, "swDFromBacktrack");
 			mGraph.addConnection("swDFromBacktrack", 2, "swD");
 			mGraph.addConnection("swDFromBacktrack", 3, "swDFromBacktrack");
+
+			// PUSH
+			mGraph.addConnection("push", 0, "push");
+			mGraph.addConnection("push", 2, "push");
+
+			// PULL
+			mGraph.addConnection("pull", 1, "pull");
+			mGraph.addConnection("pull", 2, "pull");
 		}
 
 		~Engine()
@@ -522,7 +647,9 @@ class Engine : public Leap::Listener {
 		float        mListPosition,
 		             mListNudge,
 		             mStackPosition,
-					 mStackNudge;
+					 mStackNudge,
+					 mZoom,
+					 mTargetZoom;
 
 		double mRotate;
 
@@ -604,6 +731,9 @@ class Engine : public Leap::Listener {
 			mNumStacks = 5;
 			mStackPosition = 0.0f;
 			mStackNudge = 0.0f;
+
+			mZoom = 0.0f;
+			mTargetZoom = 0.0f;
 		}
 
 		void cleanUp() {
@@ -674,6 +804,12 @@ class Engine : public Leap::Listener {
 
 			mListPosition += (targetposition - mListPosition) / 20.0f
 				- mListNudge * 0.00005f;
+
+			mZoom += (mTargetZoom - mZoom) / 5.0f;
+			if (mZoom > 1.0)
+				mZoom = 1.0;
+			else if (mZoom < -1.0)
+				mZoom = -1.0;
 		}
 
 		/**
@@ -685,8 +821,8 @@ class Engine : public Leap::Listener {
 			glMatrixMode(GL_PROJECTION);
 			glPushMatrix();
 
-			glTranslated(0.0, -40.0, -300.0);
-			glRotated(mRotate, -1.0, 0.0, 0.0);
+			glTranslated(0.0, -60.0, -300.0);
+			glRotated(mRotate * (1.0 - mZoom), -1.0, 0.0, 0.0);
 
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
@@ -695,27 +831,62 @@ class Engine : public Leap::Listener {
 //			glTranslated(mScreenWidth / 2, mScreenHeight / 2, 0.0);
 
 			double arc = 2 * PI / mNumSelections;
-			double x, z, color;
+			double x, y, z, color;
 			for (int i = 0; i < mNumSelections; ++i) {
-				glPushMatrix(); // Box
 
-				x = 250 * sin(arc * i - (mListPosition * arc));
-				z = 100 * cos(arc * i - (mListPosition * arc));
+				x = 250.0 * sin(arc * i - (mListPosition * arc));
+				y = 30.0;
+				z = 100.0 * cos(arc * i - (mListPosition * arc));
 				color = (z + 100.0) / 200.0;
-				if (i == mSelection)
+
+				if (i == mSelection) {
 					glColor4d(0.6, 0.8, 1.0, 1.0);
+					y += 5.0;
+					if (mZoom > 0.0) {
+						x *= (1.0 - mZoom);
+						y += 40.0 * mZoom;
+						z += 180.0 * mZoom;
+					}
+				}
 				else
 					glColor4d(color * 0.2, color * 0.5, color, 1.0);
 
-				glTranslated(x, 0.0, z);
+				glPushMatrix(); // Box
+				glTranslated(x, y, z);
+				if (i == mSelection && mZoom < 0.0)
+					glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
+
 				glBegin(GL_QUADS);
-					glVertex3d(-30.0, -30.0, 0.0);
 					glVertex3d(30.0,  -30.0, 0.0);
 					glVertex3d(30.0,   30.0, 0.0);
 					glVertex3d(-30.0,  30.0, 0.0);
+					glVertex3d(-30.0, -30.0, 0.0);
 				glEnd();
 
 				glPopMatrix(); // Box
+
+				glPushMatrix(); // Reflection
+				glTranslated(x, -y, z);
+				if (i == mSelection && mZoom < 0.0)
+					glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
+
+				glBegin(GL_QUADS);
+					glColor4d(color * 0.05, color * 0.1, color * 0.2, 1.0);
+					glVertex3d(-30.0,  30.0, 0.0);
+					glVertex3d(30.0,   30.0, 0.0);
+					glColor4d(0.0, 0.0, 0.0, 1.0);
+					glVertex3d(30.0,  -30.0, 0.0);
+					glVertex3d(-30.0, -30.0, 0.0);
+				glEnd();
+				
+				glPopMatrix(); // Reflection
+
+//				if (i == mSelection) {
+//					glMatrixMode(GL_PROJECTION);
+//					glPopMatrix(); // Zoom transformation
+//					glMatrixMode(GL_MODELVIEW);
+//				}
+
 			}
 
 			glPopMatrix(); // Origin
@@ -731,6 +902,9 @@ int main(int argc, char **argv) {
 		Leap::Controller controller(e);
 		e.run();
 		return 0;
+	} catch (EngineException& e) {
+		std::cout << "Exception: " << e.getMessage() << std::endl;
+		return 1;
 	} catch (std::exception& e) {
 		std::cout << "Exception: " << e.what() << std::endl;
 		return 1;
