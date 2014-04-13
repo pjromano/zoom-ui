@@ -12,8 +12,8 @@
 #include <Windows.h>
 #endif
 
-#include <gl/GL.h>
-#include <gl/GLU.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 #include <SDL2/SDL.h>
 #include <Leap.h>
 
@@ -25,7 +25,12 @@
 
 class EngineException : public std::exception {
 	public:
-		EngineException(const std::string &message) : mMessage(message) { }
+		EngineException(const std::string &message) throw()
+				: mMessage(message)
+			{ }
+
+		~EngineException() throw()
+			{ }
 
 		std::string getMessage() {
 			return mMessage;
@@ -129,9 +134,11 @@ class Engine : public Leap::Listener {
 
 			mWindow = SDL_CreateWindow("Swipe Experiment",
 				SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-				800, 600, SDL_WINDOW_OPENGL);// | SDL_WINDOW_FULLSCREEN_DESKTOP);
+				800, 600, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
 			if (!mWindow)
 				throw EngineException("SDL_CreateWindow failed");
+
+			SDL_ShowCursor(SDL_FALSE);
 
 			mGLContext = SDL_GL_CreateContext(mWindow);
 			if (!mGLContext)
@@ -252,15 +259,18 @@ class Engine : public Leap::Listener {
 			// Gravitate towards selection
 			//if (mSelection * mItemSeparation + mListPosition != 0.0)
 			if (abs(mListVelocity) < 3.0)
-				mListVelocity -= (mSelection * mItemSeparation + mListPosition) / 10.0;
+				mListVelocity -= (mSelection * mItemSeparation
+						+ mListPosition) / 10.0;
 
 			mListPosition += mListVelocity;
 
 			// List moves rightwards; selection moves leftwards
-			if (mListPosition > -mSelection * mItemSeparation + mItemSeparation / 2.0)
+			if (mListPosition > -mSelection * mItemSeparation
+					+ mItemSeparation / 2.0)
 				mSelection -= 1;
 			// Vice-versa
-			else if (mListPosition < -mSelection * mItemSeparation - mItemSeparation / 2.0)
+			else if (mListPosition < -mSelection * mItemSeparation
+					- mItemSeparation / 2.0)
 				mSelection += 1;
 		}
 
