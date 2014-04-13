@@ -254,9 +254,9 @@ class Engine : public Leap::Listener {
 				virtual void onEnter(const Leap::Frame& frame,
 						const std::string& nodeid) {
 					if (nodeid.compare("swU") == 0) {
-						e->mStackSelection--;
-					} else if (nodeid.compare("swD") == 0) {
 						e->mStackSelection++;
+					} else if (nodeid.compare("swD") == 0) {
+						e->mStackSelection--;
 					}
 				}
 		};
@@ -437,7 +437,7 @@ class Engine : public Leap::Listener {
 			bool success = true;
 
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_Motion(this, 50.0)));
+						new Node_Motion(this, 30.0)));
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
 						new Node_CoarseDirection(this)));
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
@@ -800,16 +800,22 @@ class Engine : public Leap::Listener {
 		}
 
 		void updatePosition() {
+			// Horizontal position
 			float targetposition = mSelection;
-
 			mListPosition += (targetposition - mListPosition) / 20.0f
 				- mListNudge * 0.00005f;
 
+			// Zooming
 			mZoom += (mTargetZoom - mZoom) / 5.0f;
 			if (mZoom > 1.0)
 				mZoom = 1.0;
 			else if (mZoom < -1.0)
 				mZoom = -1.0;
+
+			// Stack (vertical position)
+			targetposition = mStackSelection;
+			mStackPosition += (targetposition - mStackPosition) / 10.0f
+				- mStackNudge * 0.00005f;
 		}
 
 		/**
@@ -835,7 +841,7 @@ class Engine : public Leap::Listener {
 			for (int i = 0; i < mNumSelections; ++i) {
 
 				x = 250.0 * sin(arc * i - (mListPosition * arc));
-				y = 30.0;
+				y = 30.0 + mStackPosition * 50.0;
 				z = 100.0 * cos(arc * i - (mListPosition * arc));
 				color = (z + 100.0) / 200.0;
 
@@ -844,7 +850,7 @@ class Engine : public Leap::Listener {
 					y += 5.0;
 					if (mZoom > 0.0) {
 						x *= (1.0 - mZoom);
-						y += 40.0 * mZoom;
+						y = y * (1.0 - mZoom) + 50.0 * mZoom;
 						z += 180.0 * mZoom;
 					}
 				}
