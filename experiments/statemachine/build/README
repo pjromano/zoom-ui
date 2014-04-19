@@ -1,0 +1,3 @@
+VC++
+----
+Each test has its own individual VC++ project because Visual Studio is annoying. Use the solution at :/build/ to build all at once.

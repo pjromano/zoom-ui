@@ -1,6 +1,6 @@
 /*
 	Philip Romano
-	4/12/2014
+	4/13/2014
 	homescreen.cpp
 
 	Test for GestureStateGraph
@@ -12,6 +12,10 @@
 #include <string>
 #include <math.h>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <Leap.h>
 #include <SDL2/SDL.h>
 #include <GL/gl.h>
@@ -21,6 +25,10 @@
 
 #include "gesturestategraph.h"
 #include "gesturenode.h"
+
+#ifdef _WIN32
+#undef main // Windows doesn't like the SDL_main thing
+#endif
 
 #define PI 3.1415926535
 
@@ -69,16 +77,17 @@ class Engine : public Leap::Listener {
 
 				  Slots:
 					1 if one hand is present, and the magnitude of velocity is
-					    >= 200 mm/s
+					    >= threshold
 					0 otherwise
 				*/
 				virtual int evaluate(const Leap::Frame& frame,
 						const std::string& nodeid) {
 					if (e->mMainHand.isValid()
-							&& e->mXYHandSpeed >= mThreshold)
+							&& e->mHandVelocity.magnitude() >= mThreshold)
 						return 1;
 					else {
 						e->mListNudge = e->mHandVelocity.x;
+						e->mStackNudge = -e->mHandVelocity.y;
 						return 0;
 					}
 				}
@@ -254,9 +263,11 @@ class Engine : public Leap::Listener {
 				virtual void onEnter(const Leap::Frame& frame,
 						const std::string& nodeid) {
 					if (nodeid.compare("swU") == 0) {
-						e->mStackSelection++;
+						if (e->mCurrentStack < e->mNumStacks - 1)
+							e->mCurrentStack++;
 					} else if (nodeid.compare("swD") == 0) {
-						e->mStackSelection--;
+						if (e->mCurrentStack > 0)
+							e->mCurrentStack--;
 					}
 				}
 		};
@@ -437,7 +448,7 @@ class Engine : public Leap::Listener {
 			bool success = true;
 
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
-						new Node_Motion(this, 30.0)));
+						new Node_Motion(this, 50.0)));
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
 						new Node_CoarseDirection(this)));
 			success &= mGraph.createNodeType(boost::shared_ptr<GestureNode>(
@@ -575,6 +586,7 @@ class Engine : public Leap::Listener {
 
 		virtual void onConnect(const Leap::Controller &c) {
 			std::cout << "Connected" << std::endl;
+			c.setPolicyFlags(Leap::Controller::PolicyFlag::POLICY_BACKGROUND_FRAMES);
 		}
 
 		virtual void onFrame(const Leap::Controller &c) {
@@ -584,31 +596,42 @@ class Engine : public Leap::Listener {
 			if (frame.hands().count() == 1) {
 				// Average of fingers + palm
 				mMainHand = (*frame.hands().begin());
+				
+				Leap::FingerList fingers = mMainHand.fingers();
+				mCurrentVelocity = Leap::Vector(0.0f, 0.0f, 0.0f);
+				if (fingers.count() > 0) {
+					for (Leap::FingerList::const_iterator it
+							= fingers.begin();
+							it != fingers.end(); ++it) {
+						mCurrentVelocity += (*it).tipVelocity();
+					}
+					mCurrentVelocity /= (float)fingers.count();
+				}
+				mCurrentVelocity += mMainHand.palmVelocity();
+				if (fingers.count() > 0)
+					mCurrentVelocity /= 2.0;
+				updateHandVelocity();
+
+				Leap::Vector xyvel = mHandVelocity;
+				xyvel.z = 0.0f;
+				mXYHandSpeed = xyvel.magnitude();
+
 				if (mMainHand.fingers().count() >= 3) {
 					swiping = true;
-					Leap::FingerList fingers = mMainHand.fingers();
-					mCurrentVelocity = Leap::Vector(0.0f, 0.0f, 0.0f);
-					if (fingers.count() > 0) {
-						for (Leap::FingerList::const_iterator it
-								= fingers.begin();
-								it != fingers.end(); ++it) {
-							mCurrentVelocity += (*it).tipVelocity();
-						}
-						mCurrentVelocity /= (float)fingers.count();
-					}
-					mCurrentVelocity += mMainHand.palmVelocity();
-					if (fingers.count() > 0)
-						mCurrentVelocity /= 2.0;
-					updateHandVelocity();
-
-					Leap::Vector xyvel = mHandVelocity;
-					xyvel.z = 0.0f;
-					mXYHandSpeed = xyvel.magnitude();
-
 					// Stupid temporary fun
 					// Maybe keep it?
-					mRotate = 30.0 / PI * atan2(mMainHand.palmNormal().y,
+					mTargetRotate = 30.0 / PI * atan2(mMainHand.palmNormal().y,
 							mMainHand.palmNormal().z) + 20.0;
+					if (mTargetRotate > 50.0)
+						mTargetRotate = 50.0;
+					else if (mTargetRotate < -10.0)
+						mTargetRotate = -10.0;
+				} else {
+					if (mHandVelocity.magnitude() > 100.0) {
+						SDL_RestoreWindow(mWindow);
+						SDL_MaximizeWindow(mWindow);
+						SDL_RaiseWindow(mWindow);
+					}
 				}
 			}
 			
@@ -639,19 +662,19 @@ class Engine : public Leap::Listener {
 
 		Leap::Hand   mMainHand;
 		Leap::Vector mHandVelocity;
-		float        mXYHandSpeed;
+		double       mXYHandSpeed;
 		int          mSelection,
 		             mNumSelections,
-					 mStackSelection,
+					 mCurrentStack,
 					 mNumStacks;
-		float        mListPosition,
+		double       mListPosition,
 		             mListNudge,
-		             mStackPosition,
-					 mStackNudge,
-					 mZoom,
-					 mTargetZoom;
-
-		double mRotate;
+					 mStackPosition,
+		             mStackNudge,
+		             mZoom,
+		             mTargetZoom,
+		             mTargetRotate,
+					 mRotate;
 
 		Leap::Vector mCurrentVelocity;
 		int mNumSmoothing, mAverageVelocityCurrentIndex;
@@ -697,6 +720,8 @@ class Engine : public Leap::Listener {
 
 			glEnable(GL_DEPTH_TEST);
 			glDepthFunc(GL_LEQUAL);
+			glEnable(GL_ALPHA_TEST);
+			glAlphaFunc(GL_ALWAYS, 0.0);
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			glClearDepth(1.0);
@@ -722,18 +747,21 @@ class Engine : public Leap::Listener {
 		}
 
 		void initializeApplication() {
+			mCurrentStack = 0;
+			mNumStacks = 20;
+			mStackNudge = 0.0;
+			mStackPosition = 0.0;
+
 			mSelection = 0;
 			mNumSelections = 20;
-			mListPosition = 0.0f;
-			mListNudge = 0.0f;
+			mListNudge = 0.0;
+			mListPosition = 0.0;
 
-			mStackSelection = 0;
-			mNumStacks = 5;
-			mStackPosition = 0.0f;
-			mStackNudge = 0.0f;
+			mZoom = 0.0;
+			mTargetZoom = 0.0;
 
-			mZoom = 0.0f;
-			mTargetZoom = 0.0f;
+			mRotate = 0.0;
+			mTargetRotate = 0.0;
 		}
 
 		void cleanUp() {
@@ -801,9 +829,14 @@ class Engine : public Leap::Listener {
 
 		void updatePosition() {
 			// Horizontal position
-			float targetposition = mSelection;
+			double targetposition = (double)mSelection;
 			mListPosition += (targetposition - mListPosition) / 20.0f
 				- mListNudge * 0.00005f;
+
+			// Stack (vertical position)
+			targetposition = (double)mCurrentStack;
+			mStackPosition += (targetposition - mStackPosition) / 10.0f;
+				//- mStackNudge * 0.00005f;
 
 			// Zooming
 			mZoom += (mTargetZoom - mZoom) / 5.0f;
@@ -812,10 +845,8 @@ class Engine : public Leap::Listener {
 			else if (mZoom < -1.0)
 				mZoom = -1.0;
 
-			// Stack (vertical position)
-			targetposition = mStackSelection;
-			mStackPosition += (targetposition - mStackPosition) / 10.0f
-				- mStackNudge * 0.00005f;
+			// Rotation
+			mRotate += (mTargetRotate - mRotate) / 5.0f;
 		}
 
 		/**
@@ -827,72 +858,109 @@ class Engine : public Leap::Listener {
 			glMatrixMode(GL_PROJECTION);
 			glPushMatrix();
 
-			glTranslated(0.0, -60.0, -300.0);
-			glRotated(mRotate * (1.0 - mZoom), -1.0, 0.0, 0.0);
+			glTranslated(0.0, -40.0, -300.0);
 
 			glMatrixMode(GL_MODELVIEW);
 			glLoadIdentity();
 			glPushMatrix(); // Origin
 
-//			glTranslated(mScreenWidth / 2, mScreenHeight / 2, 0.0);
-
 			double arc = 2 * PI / mNumSelections;
 			double x, y, z, color;
-			for (int i = 0; i < mNumSelections; ++i) {
 
-				x = 250.0 * sin(arc * i - (mListPosition * arc));
-				y = 30.0 + mStackPosition * 50.0;
-				z = 100.0 * cos(arc * i - (mListPosition * arc));
-				color = (z + 100.0) / 200.0;
+			for (int stack = 0; stack < mNumStacks; ++stack) {
 
-				if (i == mSelection) {
-					glColor4d(0.6, 0.8, 1.0, 1.0);
-					y += 5.0;
-					if (mZoom > 0.0) {
-						x *= (1.0 - mZoom);
-						y = y * (1.0 - mZoom) + 50.0 * mZoom;
-						z += 180.0 * mZoom;
+				if (mStackPosition >(double)stack - 0.999
+						&& mStackPosition < (double)stack + 0.999) {
+
+					// Draw the center (active) list
+					double factor = 1.0 - abs(mStackPosition - stack);
+
+					glPushMatrix(); // Center list rotation
+					glRotated(factor * mRotate * (1.0 - mZoom), -1.0, 0.0, 0.0);
+
+					for (int i = 0; i < mNumSelections; ++i) {
+
+						x = 250.0 * sin(arc * i - (mListPosition * arc))
+							* factor;
+						y = -stack * 100.0 + mStackPosition * 100.0;
+						z = 100.0 * cos(arc * i - (mListPosition * arc))
+							* factor;
+
+						color = (z + 100.0) / 200.0;
+
+						if (i == mSelection && stack == mCurrentStack) {
+							glColor4d(0.6, 0.8, 1.0, 1.0);
+							y += 5.0;
+							if (mZoom > 0.0) {
+								x *= (1.0 - mZoom);
+								y = y * (1.0 - mZoom) + 40.0 * mZoom;
+								z += 180.0 * mZoom;
+							}
+						}
+						else
+							glColor4d(color * 0.2, color * 0.5, color, 1.0);
+
+						glPushMatrix(); // Box
+						glTranslated(x, y, z);
+						if (i == mSelection && mZoom < 0.0)
+							glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
+
+						glBegin(GL_QUADS);
+							glVertex3d(30.0, -10.0 - 20.0 * factor, 0.0);
+							glVertex3d(30.0, 10.0 + 20.0 * factor, 0.0);
+							glVertex3d(-30.0, 10.0 + 20.0 * factor, 0.0);
+							glVertex3d(-30.0, -10.0 - 20.0 * factor, 0.0);
+						glEnd();
+
+						glPopMatrix(); // Box
+
+						/*
+						// Translucency (or translucency effect) is awful
+						glPushMatrix(); // Reflection
+						glTranslated(x, -y, z - 1.0);
+						if (i == mSelection && mZoom < 0.0)
+							glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
+
+						glBegin(GL_QUADS);
+							//glColor4d(color * 0.05, color * 0.1, color * 0.2, 1.0);
+							glColor4d(color * 0.2, color * 0.5, color * 0.8, 0.4);
+							glVertex3d(-30.0, 30.0, 0.0);
+							glVertex3d(30.0, 30.0, 0.0);
+							//glColor4d(0.0, 0.0, 0.0, 1.0);
+							glColor4d(color * 0.2, color * 0.5, color * 0.8, 0.0);
+							glVertex3d(30.0, -30.0, 0.0);
+							glVertex3d(-30.0, -30.0, 0.0);
+						glEnd();
+
+						glPopMatrix(); // Reflection
+
+						*/
 					}
+
+					glPopMatrix(); // Center list rotation
+
+				} else {
+					// Draw the non-active lists (just single boxes)
+					x = 0.0;
+					if (stack < mCurrentStack)
+						y = 75.0 - stack * 25.0 + mStackPosition * 25.0;
+					else
+						y = -75.0 - stack * 25.0 + mStackPosition * 25.0;
+					z = 0.0;
+
+					glPushMatrix(); // Box
+					glTranslated(x, y, z);
+
+					glBegin(GL_QUADS);
+						glColor4d(0.1, 0.25, 0.5, 1.0);
+						glVertex3d(30.0, -10.0, 0.0);
+						glVertex3d(30.0, 10.0, 0.0);
+						glVertex3d(-30.0, 10.0, 0.0);
+						glVertex3d(-30.0, -10.0, 0.0);
+					glEnd();
+
+					glPopMatrix(); // Box
 				}
-				else
-					glColor4d(color * 0.2, color * 0.5, color, 1.0);
-
-				glPushMatrix(); // Box
-				glTranslated(x, y, z);
-				if (i == mSelection && mZoom < 0.0)
-					glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
-
-				glBegin(GL_QUADS);
-					glVertex3d(30.0,  -30.0, 0.0);
-					glVertex3d(30.0,   30.0, 0.0);
-					glVertex3d(-30.0,  30.0, 0.0);
-					glVertex3d(-30.0, -30.0, 0.0);
-				glEnd();
-
-				glPopMatrix(); // Box
-
-				glPushMatrix(); // Reflection
-				glTranslated(x, -y, z);
-				if (i == mSelection && mZoom < 0.0)
-					glScaled(1.0 + mZoom, 1.0 + mZoom, 0.0);
-
-				glBegin(GL_QUADS);
-					glColor4d(color * 0.05, color * 0.1, color * 0.2, 1.0);
-					glVertex3d(-30.0,  30.0, 0.0);
-					glVertex3d(30.0,   30.0, 0.0);
-					glColor4d(0.0, 0.0, 0.0, 1.0);
-					glVertex3d(30.0,  -30.0, 0.0);
-					glVertex3d(-30.0, -30.0, 0.0);
-				glEnd();
-				
-				glPopMatrix(); // Reflection
-
-//				if (i == mSelection) {
-//					glMatrixMode(GL_PROJECTION);
-//					glPopMatrix(); // Zoom transformation
-//					glMatrixMode(GL_MODELVIEW);
-//				}
-
 			}
 
 			glPopMatrix(); // Origin

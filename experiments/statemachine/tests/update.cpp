@@ -18,6 +18,10 @@
 #include "gesturestategraph.h"
 #include "gesturenode.h"
 
+#ifdef _WIN32
+#undef main // Windows doesn't like the SDL_main thing
+#endif
+
 class Node_OneHand : public GestureNode {
 	public:
 		virtual std::string& getName() {

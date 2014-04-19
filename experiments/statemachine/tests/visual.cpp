@@ -13,6 +13,10 @@
 #include <string>
 #include <math.h>
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <Leap.h>
 #include <SDL2/SDL.h>
 #include <GL/gl.h>
@@ -21,6 +25,10 @@
 
 #include "gesturestategraph.h"
 #include "gesturenode.h"
+
+#ifdef _WIN32
+#undef main // Windows doesn't like the SDL_main thing
+#endif
 
 #define PI 3.1415926535
 
@@ -514,17 +522,16 @@ class Engine : public Leap::Listener {
 
 		Leap::Hand   mMainHand;
 		Leap::Vector mHandVelocity;
-		float        mXYHandSpeed;
+		double       mXYHandSpeed;
 		int          mSelection,
 		             mNumSelections,
 					 mStackSelection,
 					 mNumStacks;
-		float        mListPosition,
+		double       mListPosition,
 		             mListNudge,
 		             mStackPosition,
-					 mStackNudge;
-
-		double mRotate;
+		             mStackNudge,
+		             mRotate;
 
 		Leap::Vector mCurrentVelocity;
 		int mNumSmoothing, mAverageVelocityCurrentIndex;

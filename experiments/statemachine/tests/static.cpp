@@ -9,7 +9,6 @@
 #include <math.h>
 
 #include <Leap.h>
-#include <SDL2/SDL.h>
 #include <boost/shared_ptr.hpp>
 
 #include "gesturestategraph.h"

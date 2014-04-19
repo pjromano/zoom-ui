@@ -6,6 +6,8 @@
 	GestureNode class
 */
 
+#include <string>
+#include <Leap.h>
 #include "gesturenode.h"
 
 void GestureNode::onEnter(const Leap::Frame& frame,
